@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { WelcomePage } from "@/pages/WelcomePage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { TranslationsPage } from "@/pages/TranslationsPage";
@@ -10,6 +11,10 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { LoginPage } from "@/pages/LoginPage";
 
 export const router = createBrowserRouter([
+  {
+    path: "/welcome",
+    Component: WelcomePage,
+  },
   {
     path: "/login",
     Component: LoginPage,
