@@ -1,49 +1,30 @@
 import { createBrowserRouter } from "react-router";
-import { HomeScreen } from "../screens/HomeScreen";
-import { TranslateScreen } from "../screens/TranslateScreen";
-import { BudgetScreen } from "../screens/BudgetScreen";
-import { ProfileScreen } from "../screens/ProfileScreen";
-import { ServicesScreen } from "../screens/ServicesScreen";
-import { LoginScreen } from "../screens/LoginScreen";
-import { SignUpScreen } from "../screens/SignUpScreen";
-import { AuthCallbackScreen } from "../screens/AuthCallbackScreen";
-import { AdminDashboardScreen } from "../screens/AdminDashboardScreen";
+import { AdminLayout } from "@/components/layout/AdminLayout";
+import { DashboardPage } from "@/pages/DashboardPage";
+import { UsersPage } from "@/pages/UsersPage";
+import { TranslationsPage } from "@/pages/TranslationsPage";
+import { ServicesPage } from "@/pages/ServicesPage";
+import { AnnouncementsPage } from "@/pages/AnnouncementsPage";
+import { ReportsPage } from "@/pages/ReportsPage";
+import { SettingsPage } from "@/pages/SettingsPage";
+import { LoginPage } from "@/pages/LoginPage";
 
 export const router = createBrowserRouter([
   {
-    path: "/",
-    Component: HomeScreen,
-  },
-  {
     path: "/login",
-    Component: LoginScreen,
+    Component: LoginPage,
   },
   {
-    path: "/signup",
-    Component: SignUpScreen,
-  },
-  {
-    path: "/auth/callback",
-    Component: AuthCallbackScreen,
-  },
-  {
-    path: "/translate",
-    Component: TranslateScreen,
-  },
-  {
-    path: "/budget",
-    Component: BudgetScreen,
-  },
-  {
-    path: "/services",
-    Component: ServicesScreen,
-  },
-  {
-    path: "/profile",
-    Component: ProfileScreen,
-  },
-  {
-    path: "/admin",
-    Component: AdminDashboardScreen,
+    path: "/",
+    Component: AdminLayout,
+    children: [
+      { index: true, Component: DashboardPage },
+      { path: "users", Component: UsersPage },
+      { path: "translations", Component: TranslationsPage },
+      { path: "services", Component: ServicesPage },
+      { path: "announcements", Component: AnnouncementsPage },
+      { path: "reports", Component: ReportsPage },
+      { path: "settings", Component: SettingsPage },
+    ],
   },
 ]);

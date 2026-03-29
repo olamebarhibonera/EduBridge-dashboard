@@ -1,14 +1,14 @@
-import { RouterProvider } from 'react-router';
-import { router } from './navigation';
-import { AuthProvider, ThemeProvider } from './contexts';
+import { RouterProvider } from "react-router";
+import { router } from "./navigation";
+import { AuthProvider } from "./contexts/AuthContext";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <RouterProvider router={router} />
+      <Toaster />
+    </AuthProvider>
   );
 }
 
