@@ -12,7 +12,7 @@ import { LoginPage } from "@/pages/LoginPage";
 
 export const router = createBrowserRouter([
   {
-    path: "/welcome",
+    path: "/",
     Component: WelcomePage,
   },
   {
@@ -20,7 +20,7 @@ export const router = createBrowserRouter([
     Component: LoginPage,
   },
   {
-    path: "/",
+    path: "/admin",
     Component: AdminLayout,
     children: [
       { index: true, Component: DashboardPage },

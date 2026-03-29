@@ -1,5 +1,6 @@
 import { Outlet, useNavigate } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
 import { Separator } from "@/components/ui/separator";
@@ -14,16 +15,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 
 const pageTitles: Record<string, string> = {
-  "/": "Dashboard",
-  "/users": "User Management",
-  "/translations": "Translations",
-  "/services": "Services",
-  "/announcements": "Announcements",
-  "/reports": "Reports",
-  "/settings": "Settings",
+  "/admin": "Dashboard",
+  "/admin/users": "User Management",
+  "/admin/translations": "Translations",
+  "/admin/services": "Services",
+  "/admin/announcements": "Announcements",
+  "/admin/reports": "Reports",
+  "/admin/settings": "Settings",
 };
 
-export function AdminLayout() {
+function AdminLayoutInner() {
   const { user, loading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,5 +75,13 @@ export function AdminLayout() {
         </main>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+export function AdminLayout() {
+  return (
+    <AuthProvider>
+      <AdminLayoutInner />
+    </AuthProvider>
   );
 }

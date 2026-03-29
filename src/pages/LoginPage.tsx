@@ -50,7 +50,7 @@ export function LoginPage() {
           return;
         }
 
-        navigate("/");
+        navigate("/admin");
       }
     } catch {
       setError("An unexpected error occurred");
@@ -60,7 +60,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-50 via-background to-purple-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-pink-50 via-background to-rose-50 p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/25">

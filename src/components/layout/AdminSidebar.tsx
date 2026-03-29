@@ -28,13 +28,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
 
 const navItems = [
-  { title: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { title: "Users", icon: Users, path: "/users" },
-  { title: "Translations", icon: Languages, path: "/translations" },
-  { title: "Services", icon: MapPin, path: "/services" },
-  { title: "Announcements", icon: Megaphone, path: "/announcements" },
-  { title: "Reports", icon: FileBarChart, path: "/reports" },
-  { title: "Settings", icon: Settings, path: "/settings" },
+  { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
+  { title: "Users", icon: Users, path: "/admin/users" },
+  { title: "Translations", icon: Languages, path: "/admin/translations" },
+  { title: "Services", icon: MapPin, path: "/admin/services" },
+  { title: "Announcements", icon: Megaphone, path: "/admin/announcements" },
+  { title: "Reports", icon: FileBarChart, path: "/admin/reports" },
+  { title: "Settings", icon: Settings, path: "/admin/settings" },
 ];
 
 export function AdminSidebar() {
@@ -50,7 +50,7 @@ export function AdminSidebar() {
             <SidebarMenuButton
               size="lg"
               className="data-[state=open]:bg-sidebar-accent"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/admin")}
             >
               <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                 <GraduationCap className="size-4" />

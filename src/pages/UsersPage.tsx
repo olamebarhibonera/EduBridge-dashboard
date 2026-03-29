@@ -277,7 +277,7 @@ export function UsersPage() {
   const roleBadge = (role: string) => {
     if (role === "admin")
       return (
-        <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+        <Badge className="bg-pink-100 text-pink-800 border-pink-200">
           <Shield className="mr-1 size-3" />
           Admin
         </Badge>
