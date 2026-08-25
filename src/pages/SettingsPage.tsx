@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
+import { listSettings, upsertSettings } from "@/services/settings";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Settings {
@@ -49,11 +49,9 @@ export function SettingsPage() {
 
   useEffect(() => {
     async function fetchSettings() {
-      const { data } = await supabase
-        .from("app_settings")
-        .select("key, value");
+      const data = await listSettings();
 
-      if (data) {
+      if (data.length > 0) {
         const merged = { ...DEFAULT_SETTINGS };
         for (const row of data) {
           if (row.key in merged) {
@@ -75,9 +73,7 @@ export function SettingsPage() {
         updated_by: user?.id,
       }));
 
-      for (const entry of entries) {
-        await supabase.from("app_settings").upsert(entry, { onConflict: "key" });
-      }
+      await upsertSettings(entries);
 
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);

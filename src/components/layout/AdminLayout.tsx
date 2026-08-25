@@ -30,10 +30,11 @@ function AdminLayoutInner() {
   const location = useLocation();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+    if (!user || !isAdmin) {
       navigate("/login");
     }
-  }, [loading, user, navigate]);
+  }, [loading, user, isAdmin, navigate]);
 
   if (loading) {
     return (
@@ -46,7 +47,7 @@ function AdminLayoutInner() {
     );
   }
 
-  if (!user) return null;
+  if (!user || !isAdmin) return null;
 
   const currentTitle = pageTitles[location.pathname] || "EduBridge Admin";
 
@@ -64,11 +65,6 @@ function AdminLayoutInner() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          {!isAdmin && (
-            <span className="ml-auto text-xs text-muted-foreground bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-              View Only — Admin role required
-            </span>
-          )}
         </header>
         <main className="flex-1 overflow-auto p-6">
           <Outlet />

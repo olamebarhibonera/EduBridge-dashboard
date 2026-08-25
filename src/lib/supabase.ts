@@ -1,12 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ??
-  "https://xhitkkmtytcakjqytlnm.supabase.co";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXRra210eXRjYWtqcXl0bG5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTU2MTEsImV4cCI6MjA4NzA5MTYxMX0.ngCbkwn_f2f8nYiKzS1qCx0rSgbYFsQ4-pqBdsy7kOo";
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    "Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Copy .env.example to .env."
+  );
+}
 
 const locks = new Map<string, Promise<unknown>>();
 

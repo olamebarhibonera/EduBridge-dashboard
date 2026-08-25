@@ -40,17 +40,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/lib/utils";
-import type { Announcement } from "@/db/schema";
+import {
+  createAnnouncement,
+  deleteAnnouncement,
+  listAnnouncements,
+  updateAnnouncement,
+} from "@/services/announcements";
+import type { AnnouncementRow } from "@/types/database";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
 export function AnnouncementsPage() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Announcement | null>(null);
+  const [editing, setEditing] = useState<AnnouncementRow | null>(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -63,12 +68,14 @@ export function AnnouncementsPage() {
 
   const fetchAnnouncements = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("announcements")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setAnnouncements((data as Announcement[]) || []);
-    setLoading(false);
+    try {
+      setAnnouncements(await listAnnouncements());
+    } catch (err) {
+      console.error("Failed to load announcements:", err);
+      setAnnouncements([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -88,16 +95,16 @@ export function AnnouncementsPage() {
     setDialogOpen(true);
   };
 
-  const openEdit = (a: Announcement) => {
+  const openEdit = (a: AnnouncementRow) => {
     setEditing(a);
     setForm({
       title: a.title,
       content: a.content,
       priority: a.priority || "normal",
-      target_audience: a.targetAudience || "all",
-      is_active: a.isActive ?? true,
-      expires_at: a.expiresAt
-        ? new Date(a.expiresAt).toISOString().slice(0, 16)
+      target_audience: a.target_audience || "all",
+      is_active: a.is_active ?? true,
+      expires_at: a.expires_at
+        ? new Date(a.expires_at).toISOString().slice(0, 16)
         : "",
     });
     setDialogOpen(true);
@@ -114,24 +121,21 @@ export function AnnouncementsPage() {
     };
 
     if (editing) {
-      await supabase.from("announcements").update(payload).eq("id", editing.id);
+      await updateAnnouncement(editing.id, payload);
     } else {
-      await supabase.from("announcements").insert(payload);
+      await createAnnouncement(payload);
     }
     setDialogOpen(false);
     fetchAnnouncements();
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("announcements").delete().eq("id", id);
+    await deleteAnnouncement(id);
     fetchAnnouncements();
   };
 
   const toggleActive = async (id: string, current: boolean) => {
-    await supabase
-      .from("announcements")
-      .update({ is_active: !current })
-      .eq("id", id);
+    await updateAnnouncement(id, { is_active: !current });
     fetchAnnouncements();
   };
 
@@ -210,22 +214,22 @@ export function AnnouncementsPage() {
                     <TableCell>{priorityBadge(a.priority || "normal")}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        {a.targetAudience || "all"}
+                        {a.target_audience || "all"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Switch
-                        checked={a.isActive ?? true}
+                        checked={a.is_active ?? true}
                         onCheckedChange={() =>
-                          toggleActive(a.id, a.isActive ?? true)
+                          toggleActive(a.id, a.is_active ?? true)
                         }
                       />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {a.expiresAt ? formatDate(a.expiresAt) : "Never"}
+                      {a.expires_at ? formatDate(a.expires_at) : "Never"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {a.createdAt ? formatDate(a.createdAt) : "—"}
+                      {a.created_at ? formatDate(a.created_at) : "—"}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

@@ -49,9 +49,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/lib/supabase";
 import { exportTranslationsReport } from "@/lib/pdf-export";
-import type { Translation } from "@/db/schema";
+import {
+  createTranslation,
+  deleteTranslation,
+  listTranslations,
+  updateTranslation,
+} from "@/services/translations";
+import type { TranslationRow } from "@/types/database";
 
 const CATEGORIES = [
   "general",
@@ -65,12 +70,12 @@ const CATEGORIES = [
 ];
 
 export function TranslationsPage() {
-  const [translations, setTranslations] = useState<Translation[]>([]);
+  const [translations, setTranslations] = useState<TranslationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Translation | null>(null);
+  const [editing, setEditing] = useState<TranslationRow | null>(null);
 
   const [form, setForm] = useState({
     source_text: "",
@@ -83,21 +88,15 @@ export function TranslationsPage() {
 
   const fetchTranslations = async () => {
     setLoading(true);
-    let query = supabase
-      .from("translations")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (categoryFilter !== "all") query = query.eq("category", categoryFilter);
-    if (search) {
-      query = query.or(
-        `source_text.ilike.%${search}%,translated_text.ilike.%${search}%`
-      );
+    try {
+      const data = await listTranslations({ category: categoryFilter, search });
+      setTranslations(data);
+    } catch (err) {
+      console.error("Failed to load translations:", err);
+      setTranslations([]);
+    } finally {
+      setLoading(false);
     }
-
-    const { data } = await query;
-    setTranslations((data as Translation[]) || []);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -122,32 +121,29 @@ export function TranslationsPage() {
     setDialogOpen(true);
   };
 
-  const openEdit = (t: Translation) => {
+  const openEdit = (t: TranslationRow) => {
     setEditing(t);
     setForm({
-      source_text: t.sourceText,
-      translated_text: t.translatedText,
-      source_language: t.sourceLanguage,
-      target_language: t.targetLanguage,
+      source_text: t.source_text,
+      translated_text: t.translated_text,
+      source_language: t.source_language,
+      target_language: t.target_language,
       category: t.category || "general",
-      is_verified: t.isVerified || false,
+      is_verified: t.is_verified || false,
     });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (editing) {
-      await supabase
-        .from("translations")
-        .update({
-          source_text: form.source_text,
-          translated_text: form.translated_text,
-          category: form.category,
-          is_verified: form.is_verified,
-        })
-        .eq("id", editing.id);
+      await updateTranslation(editing.id, {
+        source_text: form.source_text,
+        translated_text: form.translated_text,
+        category: form.category,
+        is_verified: form.is_verified,
+      });
     } else {
-      await supabase.from("translations").insert({
+      await createTranslation({
         source_text: form.source_text,
         translated_text: form.translated_text,
         source_language: form.source_language,
@@ -161,15 +157,12 @@ export function TranslationsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("translations").delete().eq("id", id);
+    await deleteTranslation(id);
     fetchTranslations();
   };
 
   const toggleVerified = async (id: string, current: boolean) => {
-    await supabase
-      .from("translations")
-      .update({ is_verified: !current })
-      .eq("id", id);
+    await updateTranslation(id, { is_verified: !current });
     fetchTranslations();
   };
 
@@ -188,10 +181,10 @@ export function TranslationsPage() {
             onClick={() =>
               exportTranslationsReport(
                 translations.map((t) => ({
-                  source_text: t.sourceText,
-                  translated_text: t.translatedText,
+                  source_text: t.source_text,
+                  translated_text: t.translated_text,
                   category: t.category,
-                  is_verified: t.isVerified ? "Yes" : "No",
+                  is_verified: t.is_verified ? "Yes" : "No",
                 }))
               )
             }
@@ -267,10 +260,10 @@ export function TranslationsPage() {
                 translations.map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="max-w-[200px] truncate text-sm">
-                      {t.sourceText}
+                      {t.source_text}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-sm">
-                      {t.translatedText}
+                      {t.translated_text}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{t.category}</Badge>
@@ -281,10 +274,10 @@ export function TranslationsPage() {
                         size="icon"
                         className="size-8"
                         onClick={() =>
-                          toggleVerified(t.id, t.isVerified || false)
+                          toggleVerified(t.id, t.is_verified || false)
                         }
                       >
-                        {t.isVerified ? (
+                        {t.is_verified ? (
                           <Check className="size-4 text-green-600" />
                         ) : (
                           <X className="size-4 text-muted-foreground" />

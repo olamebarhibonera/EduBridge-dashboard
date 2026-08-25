@@ -94,12 +94,12 @@ export function AdminSidebar() {
             <SidebarMenuButton size="lg">
               <Avatar className="size-8">
                 <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                  {getInitials(user?.fullName || user?.email || "AD")}
+                  {getInitials(user?.full_name || user?.email || "AD")}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
-                  {user?.fullName || "Admin"}
+                  {user?.full_name || "Admin"}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
                   {user?.email}

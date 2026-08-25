@@ -29,8 +29,11 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/lib/utils";
+import { listProfiles, countProfiles } from "@/services/profiles";
+import { listTranslations, countTranslations } from "@/services/translations";
+import { listServices, countServices } from "@/services/services";
+import { listTransactions, countTransactions } from "@/services/transactions";
 import {
   exportUserReport,
   exportTranslationsReport,
@@ -51,21 +54,28 @@ export function ReportsPage() {
     services: 0,
     transactions: 0,
   });
+  const [growthData, setGrowthData] = useState<{ month: string; count: number }[]>([]);
 
   useEffect(() => {
     async function fetchCounts() {
-      const [u, t, s, tx] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("translations").select("id", { count: "exact", head: true }),
-        supabase.from("services").select("id", { count: "exact", head: true }),
-        supabase.from("transactions").select("id", { count: "exact", head: true }),
+      const [users, translations, services, transactions, profiles] = await Promise.all([
+        countProfiles(),
+        countTranslations(),
+        countServices(),
+        countTransactions(),
+        listProfiles(),
       ]);
-      setStats({
-        users: u.count || 0,
-        translations: t.count || 0,
-        services: s.count || 0,
-        transactions: tx.count || 0,
-      });
+      setStats({ users, translations, services, transactions });
+
+      const monthly = new Map<string, number>();
+      for (const profile of profiles) {
+        if (!profile.created_at) continue;
+        const month = new Date(profile.created_at).toLocaleString("en-US", {
+          month: "short",
+        });
+        monthly.set(month, (monthly.get(month) ?? 0) + 1);
+      }
+      setGrowthData(Array.from(monthly, ([month, count]) => ({ month, count })));
     }
     fetchCounts();
   }, []);
@@ -74,46 +84,34 @@ export function ReportsPage() {
     setLoading(true);
     try {
       if (reportType === "users") {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const data = await listProfiles();
         exportUserReport(
-          (data || []).map((u) => ({
+          data.map((u) => ({
             ...u,
             created_at: u.created_at ? formatDate(u.created_at) : "",
           }))
         );
       } else if (reportType === "translations") {
-        const { data } = await supabase
-          .from("translations")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const data = await listTranslations();
         exportTranslationsReport(
-          (data || []).map((t) => ({
+          data.map((t) => ({
             ...t,
             is_verified: t.is_verified ? "Yes" : "No",
           }))
         );
       } else if (reportType === "transactions") {
-        const { data } = await supabase
-          .from("transactions")
-          .select("*")
-          .order("date", { ascending: false });
+        const data = await listTransactions();
         exportTransactionsReport(
-          (data || []).map((t) => ({
+          data.map((t) => ({
             ...t,
             date: t.date ? formatDate(t.date) : "",
           }))
         );
       } else if (reportType === "services") {
-        const { data } = await supabase
-          .from("services")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const data = await listServices();
         exportToPDF({
           title: "EduBridge Services Report",
-          subtitle: `Total Services: ${(data || []).length}`,
+          subtitle: `Total Services: ${data.length}`,
           columns: [
             { header: "Name", dataKey: "name" },
             { header: "Category", dataKey: "category" },
@@ -121,7 +119,7 @@ export function ReportsPage() {
             { header: "Phone", dataKey: "phone" },
             { header: "Active", dataKey: "is_active" },
           ],
-          data: (data || []).map((s) => ({
+          data: data.map((s) => ({
             ...s,
             is_active: s.is_active ? "Yes" : "No",
           })),
@@ -133,15 +131,6 @@ export function ReportsPage() {
       setLoading(false);
     }
   };
-
-  const growthData = [
-    { month: "Oct", count: 20 },
-    { month: "Nov", count: 35 },
-    { month: "Dec", count: 52 },
-    { month: "Jan", count: 71 },
-    { month: "Feb", count: 95 },
-    { month: "Mar", count: stats.users || 120 },
-  ];
 
   const reportCards = [
     {
@@ -214,7 +203,7 @@ export function ReportsPage() {
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[250px]">
-              <LineChart data={growthData}>
+              <LineChart data={growthData.length ? growthData : [{ month: "None", count: 0 }]}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} />

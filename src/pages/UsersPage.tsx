@@ -7,7 +7,6 @@ import {
   Shield,
   Ban,
   CheckCircle,
-  Plus,
   Pencil,
   Trash2,
 } from "lucide-react";
@@ -61,24 +60,29 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { supabase } from "@/lib/supabase";
 import { formatDate, getInitials } from "@/lib/utils";
 import { exportUserReport } from "@/lib/pdf-export";
-import type { Profile } from "@/db/schema";
+import {
+  deleteProfile,
+  listProfiles,
+  updateProfile,
+} from "@/services/profiles";
+import { logActivity } from "@/services/activity";
+import type { ProfileRow } from "@/types/database";
 
-type DialogMode = "view" | "create" | "edit";
+type DialogMode = "view" | "edit";
 
 export function UsersPage() {
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ProfileRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<DialogMode>("view");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<Profile | null>(null);
+  const [userToDelete, setUserToDelete] = useState<ProfileRow | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -94,22 +98,19 @@ export function UsersPage() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    let query = supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (roleFilter !== "all") query = query.eq("role", roleFilter);
-    if (statusFilter !== "all") query = query.eq("status", statusFilter);
-    if (search) {
-      query = query.or(
-        `full_name.ilike.%${search}%,email.ilike.%${search}%,university.ilike.%${search}%`
-      );
+    try {
+      const data = await listProfiles({
+        role: roleFilter,
+        status: statusFilter,
+        search,
+      });
+      setUsers(data);
+    } catch (err) {
+      console.error("Failed to load users:", err);
+      setUsers([]);
+    } finally {
+      setLoading(false);
     }
-
-    const { data } = await query;
-    setUsers((data as Profile[]) || []);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -121,117 +122,48 @@ export function UsersPage() {
     return () => clearTimeout(debounce);
   }, [search]);
 
-  const openCreate = () => {
-    setDialogMode("create");
-    setSelectedUser(null);
-    setForm({
-      full_name: "",
-      email: "",
-      university: "",
-      course: "",
-      phone: "",
-      role: "student",
-      status: "active",
-      preferred_language: "en",
-    });
-    setDialogOpen(true);
-  };
-
-  const openEdit = (user: Profile) => {
+  const openEdit = (user: ProfileRow) => {
     setDialogMode("edit");
     setSelectedUser(user);
     setForm({
-      full_name: user.fullName || "",
+      full_name: user.full_name || "",
       email: user.email || "",
       university: user.university || "",
       course: user.course || "",
       phone: user.phone || "",
       role: user.role || "student",
       status: user.status || "active",
-      preferred_language: user.preferredLanguage || "en",
+      preferred_language: user.preferred_language || "en",
     });
     setDialogOpen(true);
   };
 
-  const openView = (user: Profile) => {
+  const openView = (user: ProfileRow) => {
     setDialogMode("view");
     setSelectedUser(user);
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
+    if (dialogMode !== "edit" || !selectedUser) return;
     setSaving(true);
     try {
-      if (dialogMode === "create") {
-        const { data: authData, error: authError } =
-          await supabase.auth.admin.createUser({
-            email: form.email,
-            password: "TempPass123!",
-            email_confirm: true,
-            user_metadata: {
-              full_name: form.full_name,
-              role: form.role,
-            },
-          });
-
-        if (authError) {
-          const { error: insertError } = await supabase.from("profiles").insert({
-            id: crypto.randomUUID(),
-            full_name: form.full_name,
-            email: form.email,
-            university: form.university || null,
-            course: form.course || null,
-            phone: form.phone || null,
-            role: form.role,
-            status: form.status,
-            preferred_language: form.preferred_language,
-          });
-          if (insertError) {
-            console.error("Create user error:", insertError);
-          }
-        } else if (authData?.user) {
-          await supabase
-            .from("profiles")
-            .update({
-              full_name: form.full_name,
-              university: form.university || null,
-              course: form.course || null,
-              phone: form.phone || null,
-              role: form.role,
-              status: form.status,
-              preferred_language: form.preferred_language,
-            })
-            .eq("id", authData.user.id);
-        }
-
-        await supabase.from("activity_log").insert({
-          action: `Created user profile: ${form.full_name || form.email}`,
-          entity_type: "user",
-          metadata: { email: form.email, role: form.role },
-        });
-      } else if (dialogMode === "edit" && selectedUser) {
-        await supabase
-          .from("profiles")
-          .update({
-            full_name: form.full_name,
-            email: form.email,
-            university: form.university || null,
-            course: form.course || null,
-            phone: form.phone || null,
-            role: form.role,
-            status: form.status,
-            preferred_language: form.preferred_language,
-          })
-          .eq("id", selectedUser.id);
-
-        await supabase.from("activity_log").insert({
-          action: `Updated user profile: ${form.full_name || form.email}`,
-          entity_type: "user",
-          entity_id: selectedUser.id,
-          metadata: { changes: form },
-        });
-      }
-
+      await updateProfile(selectedUser.id, {
+        full_name: form.full_name,
+        email: form.email,
+        university: form.university || null,
+        course: form.course || null,
+        phone: form.phone || null,
+        role: form.role,
+        status: form.status,
+        preferred_language: form.preferred_language,
+      });
+      await logActivity({
+        action: `Updated user profile: ${form.full_name || form.email}`,
+        entity_type: "user",
+        entity_id: selectedUser.id,
+        metadata: { changes: form },
+      });
       setDialogOpen(false);
       fetchUsers();
     } catch (err) {
@@ -243,9 +175,9 @@ export function UsersPage() {
 
   const handleDelete = async () => {
     if (!userToDelete) return;
-    await supabase.from("profiles").delete().eq("id", userToDelete.id);
-    await supabase.from("activity_log").insert({
-      action: `Deleted user: ${userToDelete.fullName || userToDelete.email}`,
+    await deleteProfile(userToDelete.id);
+    await logActivity({
+      action: `Deleted user: ${userToDelete.full_name || userToDelete.email}`,
       entity_type: "user",
       entity_id: userToDelete.id,
     });
@@ -254,13 +186,13 @@ export function UsersPage() {
     fetchUsers();
   };
 
-  const updateUser = async (id: string, updates: Partial<Profile>) => {
-    await supabase.from("profiles").update(updates).eq("id", id);
-    await supabase.from("activity_log").insert({
+  const updateUser = async (id: string, updates: Partial<ProfileRow>) => {
+    await updateProfile(id, updates);
+    await logActivity({
       action: `Updated user ${Object.keys(updates).join(", ")}`,
       entity_type: "user",
       entity_id: id,
-      metadata: updates,
+      metadata: updates as Record<string, unknown>,
     });
     fetchUsers();
   };
@@ -412,17 +344,13 @@ export function UsersPage() {
               exportUserReport(
                 users.map((u) => ({
                   ...u,
-                  created_at: u.createdAt ? formatDate(u.createdAt) : "",
+                  created_at: u.created_at ? formatDate(u.created_at) : "",
                 }))
               )
             }
           >
             <Download className="mr-2 size-4" />
             Export
-          </Button>
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 size-4" />
-            Add User
           </Button>
         </div>
       </div>
@@ -501,12 +429,12 @@ export function UsersPage() {
                       <div className="flex items-center gap-3">
                         <Avatar className="size-8">
                           <AvatarFallback className="text-xs bg-primary/10">
-                            {getInitials(user.fullName || user.email || "?")}
+                            {getInitials(user.full_name || user.email || "?")}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium text-sm">
-                            {user.fullName || "Unnamed"}
+                            {user.full_name || "Unnamed"}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {user.email}
@@ -520,7 +448,7 @@ export function UsersPage() {
                     <TableCell>{roleBadge(user.role || "student")}</TableCell>
                     <TableCell>{statusBadge(user.status || "active")}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {user.createdAt ? formatDate(user.createdAt) : "—"}
+                      {user.created_at ? formatDate(user.created_at) : "—"}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -593,18 +521,12 @@ export function UsersPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {dialogMode === "create"
-                ? "Create New User"
-                : dialogMode === "edit"
-                ? "Edit User Profile"
-                : "User Details"}
+              {dialogMode === "edit" ? "Edit User Profile" : "User Details"}
             </DialogTitle>
             <DialogDescription>
-              {dialogMode === "create"
-                ? "Add a new user to the platform"
-                : dialogMode === "edit"
-                ? `Editing profile for ${selectedUser?.fullName || selectedUser?.email}`
-                : `Profile information for ${selectedUser?.fullName || selectedUser?.email}`}
+              {dialogMode === "edit"
+                ? `Editing profile for ${selectedUser?.full_name || selectedUser?.email}`
+                : `Profile information for ${selectedUser?.full_name || selectedUser?.email}`}
             </DialogDescription>
           </DialogHeader>
 
@@ -613,12 +535,12 @@ export function UsersPage() {
               <div className="flex items-center gap-4">
                 <Avatar className="size-16">
                   <AvatarFallback className="text-lg bg-primary/10">
-                    {getInitials(selectedUser.fullName || selectedUser.email || "?")}
+                    {getInitials(selectedUser.full_name || selectedUser.email || "?")}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="font-semibold text-lg">
-                    {selectedUser.fullName || "Unnamed"}
+                    {selectedUser.full_name || "Unnamed"}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {selectedUser.email}
@@ -640,7 +562,7 @@ export function UsersPage() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Language</Label>
-                  <p className="text-sm font-medium">{selectedUser.preferredLanguage || "en"}</p>
+                  <p className="text-sm font-medium">{selectedUser.preferred_language || "en"}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Role</Label>
@@ -680,7 +602,7 @@ export function UsersPage() {
                   onClick={handleSave}
                   disabled={saving || !form.email}
                 >
-                  {saving ? "Saving..." : dialogMode === "create" ? "Create User" : "Save Changes"}
+                  {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </>
             )}
@@ -695,7 +617,7 @@ export function UsersPage() {
             <AlertDialogDescription>
               Are you sure you want to delete{" "}
               <span className="font-semibold">
-                {userToDelete?.fullName || userToDelete?.email}
+                {userToDelete?.full_name || userToDelete?.email}
               </span>
               ? This action cannot be undone and will permanently remove their
               profile and all associated data.

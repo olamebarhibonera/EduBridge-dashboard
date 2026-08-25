@@ -50,8 +50,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase";
-import type { Service } from "@/db/schema";
+import {
+  createService,
+  deleteService,
+  listServices,
+  updateService,
+} from "@/services/services";
+import type { ServiceRow } from "@/types/database";
 
 const CATEGORIES = [
   "Hospital",
@@ -63,16 +68,18 @@ const CATEGORIES = [
   "Housing",
   "Legal",
   "Shopping",
+  "Government",
+  "Telecom",
   "Other",
 ];
 
 export function ServicesPage() {
-  const [services, setServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<ServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Service | null>(null);
+  const [editing, setEditing] = useState<ServiceRow | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -87,21 +94,15 @@ export function ServicesPage() {
 
   const fetchServices = async () => {
     setLoading(true);
-    let query = supabase
-      .from("services")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (categoryFilter !== "all") query = query.eq("category", categoryFilter);
-    if (search) {
-      query = query.or(
-        `name.ilike.%${search}%,description.ilike.%${search}%,address.ilike.%${search}%`
-      );
+    try {
+      const data = await listServices({ category: categoryFilter, search });
+      setServices(data);
+    } catch (err) {
+      console.error("Failed to load services:", err);
+      setServices([]);
+    } finally {
+      setLoading(false);
     }
-
-    const { data } = await query;
-    setServices((data as Service[]) || []);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -128,7 +129,7 @@ export function ServicesPage() {
     setDialogOpen(true);
   };
 
-  const openEdit = (s: Service) => {
+  const openEdit = (s: ServiceRow) => {
     setEditing(s);
     setForm({
       name: s.name,
@@ -138,7 +139,7 @@ export function ServicesPage() {
       phone: s.phone || "",
       email: s.email || "",
       website: s.website || "",
-      is_active: s.isActive ?? true,
+      is_active: s.is_active ?? true,
     });
     setDialogOpen(true);
   };
@@ -156,24 +157,21 @@ export function ServicesPage() {
     };
 
     if (editing) {
-      await supabase.from("services").update(payload).eq("id", editing.id);
+      await updateService(editing.id, payload);
     } else {
-      await supabase.from("services").insert(payload);
+      await createService(payload);
     }
     setDialogOpen(false);
     fetchServices();
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("services").delete().eq("id", id);
+    await deleteService(id);
     fetchServices();
   };
 
   const toggleActive = async (id: string, current: boolean) => {
-    await supabase
-      .from("services")
-      .update({ is_active: !current })
-      .eq("id", id);
+    await updateService(id, { is_active: !current });
     fetchServices();
   };
 
@@ -279,9 +277,9 @@ export function ServicesPage() {
                     </TableCell>
                     <TableCell>
                       <Switch
-                        checked={s.isActive ?? true}
+                        checked={s.is_active ?? true}
                         onCheckedChange={() =>
-                          toggleActive(s.id, s.isActive ?? true)
+                          toggleActive(s.id, s.is_active ?? true)
                         }
                       />
                     </TableCell>
