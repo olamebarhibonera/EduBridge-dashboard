@@ -7,7 +7,6 @@ import {
   Shield,
   Ban,
   CheckCircle,
-  Plus,
   Pencil,
   Trash2,
 } from "lucide-react";
@@ -65,6 +64,7 @@ import { supabase } from "@/lib/supabase";
 import { formatDate, getInitials } from "@/lib/utils";
 import { exportUserReport } from "@/lib/pdf-export";
 import type { Profile } from "@/db/schema";
+import { mapProfiles } from "@/lib/mappers";
 
 type DialogMode = "view" | "create" | "edit";
 
@@ -108,7 +108,7 @@ export function UsersPage() {
     }
 
     const { data } = await query;
-    setUsers((data as Profile[]) || []);
+    setUsers(mapProfiles((data as Record<string, unknown>[]) || []));
     setLoading(false);
   };
 
@@ -160,56 +160,13 @@ export function UsersPage() {
   };
 
   const handleSave = async () => {
+    if (dialogMode === "create") {
+      setDialogOpen(false);
+      return;
+    }
     setSaving(true);
     try {
-      if (dialogMode === "create") {
-        const { data: authData, error: authError } =
-          await supabase.auth.admin.createUser({
-            email: form.email,
-            password: "TempPass123!",
-            email_confirm: true,
-            user_metadata: {
-              full_name: form.full_name,
-              role: form.role,
-            },
-          });
-
-        if (authError) {
-          const { error: insertError } = await supabase.from("profiles").insert({
-            id: crypto.randomUUID(),
-            full_name: form.full_name,
-            email: form.email,
-            university: form.university || null,
-            course: form.course || null,
-            phone: form.phone || null,
-            role: form.role,
-            status: form.status,
-            preferred_language: form.preferred_language,
-          });
-          if (insertError) {
-            console.error("Create user error:", insertError);
-          }
-        } else if (authData?.user) {
-          await supabase
-            .from("profiles")
-            .update({
-              full_name: form.full_name,
-              university: form.university || null,
-              course: form.course || null,
-              phone: form.phone || null,
-              role: form.role,
-              status: form.status,
-              preferred_language: form.preferred_language,
-            })
-            .eq("id", authData.user.id);
-        }
-
-        await supabase.from("activity_log").insert({
-          action: `Created user profile: ${form.full_name || form.email}`,
-          entity_type: "user",
-          metadata: { email: form.email, role: form.role },
-        });
-      } else if (dialogMode === "edit" && selectedUser) {
+      if (dialogMode === "edit" && selectedUser) {
         await supabase
           .from("profiles")
           .update({
@@ -411,7 +368,11 @@ export function UsersPage() {
             onClick={() =>
               exportUserReport(
                 users.map((u) => ({
-                  ...u,
+                  full_name: u.fullName || "",
+                  email: u.email || "",
+                  university: u.university || "",
+                  role: u.role || "",
+                  status: u.status || "",
                   created_at: u.createdAt ? formatDate(u.createdAt) : "",
                 }))
               )
@@ -420,9 +381,9 @@ export function UsersPage() {
             <Download className="mr-2 size-4" />
             Export
           </Button>
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 size-4" />
-            Add User
+          <Button onClick={openCreate} variant="outline">
+            <UserPlus className="mr-2 size-4" />
+            How to add users
           </Button>
         </div>
       </div>
@@ -594,21 +555,32 @@ export function UsersPage() {
           <DialogHeader>
             <DialogTitle>
               {dialogMode === "create"
-                ? "Create New User"
+                ? "Add Users"
                 : dialogMode === "edit"
                 ? "Edit User Profile"
                 : "User Details"}
             </DialogTitle>
             <DialogDescription>
               {dialogMode === "create"
-                ? "Add a new user to the platform"
+                ? "New accounts are created when students sign up in the EduBridge mobile app. After signup, open their profile here to set role and status."
                 : dialogMode === "edit"
                 ? `Editing profile for ${selectedUser?.fullName || selectedUser?.email}`
                 : `Profile information for ${selectedUser?.fullName || selectedUser?.email}`}
             </DialogDescription>
           </DialogHeader>
 
-          {dialogMode === "view" && selectedUser ? (
+          {dialogMode === "create" ? (
+            <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
+              <p>
+                Creating auth users from the dashboard needs a server-side Supabase
+                service-role key, which cannot be used safely in the browser.
+              </p>
+              <p>
+                Ask the student to register in the app, then use <strong>Edit</strong> on
+                their row to assign admin/moderator roles.
+              </p>
+            </div>
+          ) : dialogMode === "view" && selectedUser ? (
             <div className="grid gap-4">
               <div className="flex items-center gap-4">
                 <Avatar className="size-16">
@@ -657,7 +629,11 @@ export function UsersPage() {
           )}
 
           <DialogFooter>
-            {dialogMode === "view" ? (
+            {dialogMode === "create" ? (
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Got it
+              </Button>
+            ) : dialogMode === "view" ? (
               <>
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   Close

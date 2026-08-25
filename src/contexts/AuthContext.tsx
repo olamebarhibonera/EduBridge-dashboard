@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { mapProfile } from "@/lib/mappers";
 import type { Profile } from "@/db/schema";
 
 interface AuthContextType {
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("*")
         .eq("id", userId)
         .single();
-      return data as Profile | null;
+      return mapProfile(data as Record<string, unknown> | null);
     } catch {
       return null;
     }

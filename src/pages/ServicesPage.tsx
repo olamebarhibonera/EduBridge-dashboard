@@ -52,6 +52,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import type { Service } from "@/db/schema";
+import { mapServices } from "@/lib/mappers";
 
 const CATEGORIES = [
   "Hospital",
@@ -100,7 +101,7 @@ export function ServicesPage() {
     }
 
     const { data } = await query;
-    setServices((data as Service[]) || []);
+    setServices(mapServices((data as Record<string, unknown>[]) || []));
     setLoading(false);
   };
 

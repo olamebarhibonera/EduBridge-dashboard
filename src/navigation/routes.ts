@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, redirect } from "react-router";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { WelcomePage } from "@/pages/WelcomePage";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -31,5 +31,9 @@ export const router = createBrowserRouter([
       { path: "reports", Component: ReportsPage },
       { path: "settings", Component: SettingsPage },
     ],
+  },
+  {
+    path: "*",
+    loader: () => redirect("/"),
   },
 ]);

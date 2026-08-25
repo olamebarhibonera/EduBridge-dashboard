@@ -52,6 +52,7 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { exportTranslationsReport } from "@/lib/pdf-export";
 import type { Translation } from "@/db/schema";
+import { mapTranslations } from "@/lib/mappers";
 
 const CATEGORIES = [
   "general",
@@ -96,7 +97,9 @@ export function TranslationsPage() {
     }
 
     const { data } = await query;
-    setTranslations((data as Translation[]) || []);
+    setTranslations(
+      mapTranslations((data as Record<string, unknown>[]) || [])
+    );
     setLoading(false);
   };
 

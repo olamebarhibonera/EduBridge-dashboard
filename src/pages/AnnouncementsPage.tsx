@@ -43,6 +43,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/lib/utils";
 import type { Announcement } from "@/db/schema";
+import { mapAnnouncements } from "@/lib/mappers";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
@@ -67,7 +68,9 @@ export function AnnouncementsPage() {
       .from("announcements")
       .select("*")
       .order("created_at", { ascending: false });
-    setAnnouncements((data as Announcement[]) || []);
+    setAnnouncements(
+      mapAnnouncements((data as Record<string, unknown>[]) || [])
+    );
     setLoading(false);
   };
 
