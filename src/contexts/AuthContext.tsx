@@ -8,11 +8,11 @@ import {
 } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { mapProfile } from "@/lib/mappers";
-import type { Profile } from "@/db/schema";
+import { getProfile } from "@/services/profiles";
+import type { ProfileRow } from "@/types/database";
 
 interface AuthContextType {
-  user: Profile | null;
+  user: ProfileRow | null;
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
@@ -32,29 +32,20 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Profile | null>(null);
+  const [user, setUser] = useState<ProfileRow | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
 
-  const fetchProfile = async (userId: string): Promise<Profile | null> => {
-    try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-      return mapProfile(data as Record<string, unknown> | null);
-    } catch {
-      return null;
-    }
-  };
-
   const handleSession = async (currentSession: Session | null) => {
     if (currentSession?.user) {
       setSession(currentSession);
-      const profile = await fetchProfile(currentSession.user.id);
-      setUser(profile);
+      try {
+        const profile = await getProfile(currentSession.user.id);
+        setUser(profile);
+      } catch {
+        setUser(null);
+      }
     } else {
       setSession(null);
       setUser(null);

@@ -5,7 +5,6 @@ import {
   MapPin,
   TrendingUp,
   Activity,
-  DollarSign,
 } from "lucide-react";
 import {
   Card,
@@ -33,17 +32,22 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { supabase } from "@/lib/supabase";
 import { formatDate } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { listRecentActivity } from "@/services/activity";
+import { listProfiles } from "@/services/profiles";
+import { listServices } from "@/services/services";
+import { countTranslations } from "@/services/translations";
 
 interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
   totalTranslations: number;
   totalServices: number;
-  recentUsers: { full_name: string; email: string; created_at: string; status: string }[];
-  recentActivity: { action: string; entity_type: string; created_at: string; user_id: string }[];
+  recentUsers: { full_name: string | null; email: string | null; created_at: string | null; status: string | null }[];
+  recentActivity: { action: string; entity_type: string | null; created_at: string | null; user_id: string | null }[];
+  monthlyData: { month: string; students: number; admins: number }[];
+  categoryData: { name: string; value: number }[];
 }
 
 const userChartConfig = {
@@ -60,31 +64,42 @@ export function DashboardPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [usersRes, translationsRes, servicesRes, recentUsersRes, activityRes] =
-          await Promise.all([
-            supabase.from("profiles").select("id, role, status", { count: "exact" }),
-            supabase.from("translations").select("id", { count: "exact" }),
-            supabase.from("services").select("id", { count: "exact" }),
-            supabase
-              .from("profiles")
-              .select("full_name, email, created_at, status")
-              .order("created_at", { ascending: false })
-              .limit(5),
-            supabase
-              .from("activity_log")
-              .select("action, entity_type, created_at, user_id")
-              .order("created_at", { ascending: false })
-              .limit(10),
-          ]);
+        const [profiles, translationCount, serviceRows, activity] = await Promise.all([
+          listProfiles(),
+          countTranslations(),
+          listServices(),
+          listRecentActivity(10),
+        ]);
 
-        const users = usersRes.data || [];
+        const monthlyMap = new Map<string, { students: number; admins: number }>();
+        for (const profile of profiles) {
+          if (!profile.created_at) continue;
+          const month = new Date(profile.created_at).toLocaleString("en-US", {
+            month: "short",
+          });
+          const current = monthlyMap.get(month) ?? { students: 0, admins: 0 };
+          if (profile.role === "admin") current.admins += 1;
+          else current.students += 1;
+          monthlyMap.set(month, current);
+        }
+
+        const categoryMap = new Map<string, number>();
+        for (const service of serviceRows) {
+          categoryMap.set(service.category, (categoryMap.get(service.category) ?? 0) + 1);
+        }
+
         setStats({
-          totalUsers: usersRes.count || users.length,
-          activeUsers: users.filter((u) => u.status === "active").length,
-          totalTranslations: translationsRes.count || 0,
-          totalServices: servicesRes.count || 0,
-          recentUsers: recentUsersRes.data || [],
-          recentActivity: activityRes.data || [],
+          totalUsers: profiles.length,
+          activeUsers: profiles.filter((u) => u.status === "active").length,
+          totalTranslations: translationCount,
+          totalServices: serviceRows.length,
+          recentUsers: profiles.slice(0, 5),
+          recentActivity: activity,
+          monthlyData: Array.from(monthlyMap, ([month, counts]) => ({
+            month,
+            ...counts,
+          })),
+          categoryData: Array.from(categoryMap, ([name, value]) => ({ name, value })),
         });
       } catch (err) {
         console.error("Failed to fetch dashboard stats:", err);
@@ -120,21 +135,21 @@ export function DashboardPage() {
       value: stats?.totalUsers ?? 0,
       icon: Users,
       description: `${stats?.activeUsers ?? 0} active`,
-      trend: "+12%",
+      trend: "Live",
     },
     {
       title: "Translations",
       value: stats?.totalTranslations ?? 0,
       icon: Languages,
       description: "Phrase entries",
-      trend: "+8%",
+      trend: "Live",
     },
     {
       title: "Services",
       value: stats?.totalServices ?? 0,
       icon: MapPin,
-      description: "Active listings",
-      trend: "+3%",
+      description: "Directory listings",
+      trend: "Live",
     },
     {
       title: "Activity",
@@ -145,22 +160,8 @@ export function DashboardPage() {
     },
   ];
 
-  const monthlyData = [
-    { month: "Jan", students: 45, admins: 2 },
-    { month: "Feb", students: 62, admins: 3 },
-    { month: "Mar", students: 78, admins: 3 },
-    { month: "Apr", students: 95, admins: 4 },
-    { month: "May", students: 110, admins: 4 },
-    { month: "Jun", students: 132, admins: 5 },
-  ];
-
-  const categoryData = [
-    { name: "Academic", value: 35 },
-    { name: "Housing", value: 25 },
-    { name: "Health", value: 20 },
-    { name: "Transport", value: 12 },
-    { name: "Other", value: 8 },
-  ];
+  const monthlyData = stats?.monthlyData ?? [];
+  const categoryData = stats?.categoryData ?? [];
 
   return (
     <div className="space-y-6">
@@ -204,7 +205,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ChartContainer config={userChartConfig} className="h-[300px]">
-              <BarChart data={monthlyData}>
+              <BarChart data={monthlyData.length ? monthlyData : [{ month: "None", students: 0, admins: 0 }]}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} />
@@ -236,7 +237,7 @@ export function DashboardPage() {
             >
               <PieChart>
                 <Pie
-                  data={categoryData}
+                  data={categoryData.length ? categoryData : [{ name: "None", value: 1 }]}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -247,7 +248,7 @@ export function DashboardPage() {
                     `${name} ${(percent * 100).toFixed(0)}%`
                   }
                 >
-                  {categoryData.map((_, index) => (
+                  {(categoryData.length ? categoryData : [{ name: "None", value: 1 }]).map((_, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={COLORS[index % COLORS.length]}
@@ -296,7 +297,7 @@ export function DashboardPage() {
                       {user.status}
                     </Badge>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(user.created_at)}
+                      {user.created_at ? formatDate(user.created_at) : ""}
                     </p>
                   </div>
                 </div>
@@ -329,7 +330,7 @@ export function DashboardPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {activity.entity_type} &bull;{" "}
-                      {formatDate(activity.created_at)}
+                      {activity.created_at ? formatDate(activity.created_at) : ""}
                     </p>
                   </div>
                 </div>
